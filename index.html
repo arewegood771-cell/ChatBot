@@ -296,12 +296,12 @@
                       onClick: handlePlay,
                       disabled: isPlaying,
                       className: 'flex-1 px-3 sm:px-4 py-2 sm:py-2.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-semibold text-sm sm:text-base shadow-lg'
-                    }, '▶️ Play'),
+                    }, 'Play'),
                     React.createElement('button', {
                       onClick: stopPlayback,
                       disabled: !isPlaying,
                       className: 'px-3 sm:px-4 py-2 sm:py-2.5 bg-red-500 hover:bg-red-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-semibold text-sm sm:text-base shadow-lg'
-                    }, '⏸️ Stop')
+                    }, 'Stop')
                   )
                 ),
 
@@ -327,7 +327,7 @@
                       onClick: saveSheet,
                       disabled: !newSheetName || !customSheet,
                       className: 'px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-semibold text-xs sm:text-sm shadow-lg'
-                    }, '💾 Save')
+                    }, 'Save')
                   )
                 )
               ),
