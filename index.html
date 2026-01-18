@@ -575,4 +575,19 @@
                 React.createElement('p', { className: 'mb-1 sm:mb-2' }, '• Keyboard layout: Z-M (octave 3), Q-U (octave 4), I-] (octave 5) 🥀'),
                 React.createElement('p', { className: 'mb-2 sm:mb-3' }, '• Durasi pake milidetik ya 🥀 (500 = setengah detik)'),
                 React.createElement('p', { className: 'mb-2 sm:mb-3' }, '• Bisa langsung paste Virtual Piano format terus auto convert 💔'),
-                React.createElement
+                React.createElement('div', { className: 'mt-2 sm:mt-3 p-2 sm:p-3 bg-green-500/30 rounded-lg border border-green-400/50' },
+                  React.createElement('p', { className: 'font-semibold mb-1' }, 'Cobain deh ini 😹:'),
+                  React.createElement('code', { className: 'text-xs block bg-black/30 p-2 rounded overflow-x-auto' }, 
+                    'G4-400 A4-400 C5-400 A4-400 E5-600 D5-400 C5-600 A4-400 G4-400 A4-400 C5-600 D5-600 C5-600 A4-800'
+                  )
+                )
+              )
+            )
+          );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(Piano));
+    </script>
+</body>
+</html>
