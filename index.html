@@ -8,6 +8,39 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+      }
+      .stars-bg {
+        background: linear-gradient(to bottom, #001a4d, #0d47a1, #1976d2);
+        position: relative;
+        overflow: hidden;
+      }
+      .stars-bg::before {
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background-image: 
+          radial-gradient(2px 2px at 20% 30%, white, transparent),
+          radial-gradient(2px 2px at 60% 70%, white, transparent),
+          radial-gradient(1px 1px at 50% 50%, white, transparent),
+          radial-gradient(1px 1px at 80% 10%, white, transparent),
+          radial-gradient(2px 2px at 90% 60%, white, transparent),
+          radial-gradient(1px 1px at 33% 80%, white, transparent),
+          radial-gradient(1px 1px at 15% 55%, white, transparent);
+        background-size: 200% 200%;
+        animation: twinkle 8s ease-in-out infinite;
+        opacity: 0.7;
+      }
+      @keyframes twinkle {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 1; }
+      }
+    </style>
 </head>
 <body>
     <div id="root"></div>
@@ -22,7 +55,13 @@
           const audioContextRef = React.useRef(null);
           const timeoutsRef = React.useRef([]);
 
-          // Full 88-key piano range (A0 to C8)
+          const keyboardMap = {
+            'a': 'C4', 'w': 'C#4', 's': 'D4', 'e': 'D#4', 'd': 'E4',
+            'f': 'F4', 't': 'F#4', 'g': 'G4', 'y': 'G#4', 'h': 'A4',
+            'u': 'A#4', 'j': 'B4', 'k': 'C5', 'o': 'C#5', 'l': 'D5',
+            'p': 'D#5', ';': 'E5', "'": 'F5'
+          };
+
           const generatePianoKeys = () => {
             const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
             const keys = [];
@@ -37,7 +76,7 @@
                 const isWhite = !note.includes('#');
                 const freq = 440 * Math.pow(2, (octave - 4) + (i - 9) / 12);
                 keys.push({ 
-                  note: `${note}${octave}`, 
+                  note: note + octave, 
                   freq: freq, 
                   white: isWhite
                 });
@@ -58,13 +97,26 @@
             audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
             loadSavedSheets();
             
+            const handleKeyDown = (e) => {
+              const key = e.key.toLowerCase();
+              if (keyboardMap[key] && !isPlaying) {
+                const pianoKey = allKeys.find(k => k.note === keyboardMap[key]);
+                if (pianoKey) {
+                  handleKeyPress(pianoKey);
+                }
+              }
+            };
+
+            window.addEventListener('keydown', handleKeyDown);
+            
             return () => {
               stopPlayback();
+              window.removeEventListener('keydown', handleKeyDown);
               if (audioContextRef.current) {
                 audioContextRef.current.close();
               }
             };
-          }, []);
+          }, [isPlaying]);
 
           const loadSavedSheets = () => {
             try {
@@ -79,7 +131,7 @@
 
           const saveSheet = () => {
             if (newSheetName && customSheet) {
-              const newSheets = { ...savedSheets, [newSheetName]: customSheet };
+              const newSheets = Object.assign({}, savedSheets, { [newSheetName]: customSheet });
               localStorage.setItem('pianoSheets', JSON.stringify(newSheets));
               setSavedSheets(newSheets);
               setSelectedSong(newSheetName);
@@ -89,8 +141,8 @@
           };
 
           const deleteSheet = (sheetName) => {
-            if (confirm(`Delete "${sheetName}"?`)) {
-              const newSheets = { ...savedSheets };
+            if (confirm('Delete "' + sheetName + '"?')) {
+              const newSheets = Object.assign({}, savedSheets);
               delete newSheets[sheetName];
               localStorage.setItem('pianoSheets', JSON.stringify(newSheets));
               setSavedSheets(newSheets);
@@ -98,7 +150,8 @@
             }
           };
 
-          const playNote = (frequency, duration = 300) => {
+          const playNote = (frequency, duration) => {
+            duration = duration || 300;
             const ctx = audioContextRef.current;
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
@@ -189,166 +242,149 @@
             }
           };
 
-          return (
-            <div style={{minHeight: '100vh', background: 'linear-gradient(to bottom right, #0f172a, #581c87, #0f172a)', padding: '1rem'}}>
-              <div style={{maxWidth: '90rem', margin: '0 auto'}}>
-                <h1 style={{fontSize: '2rem', fontWeight: 'bold', color: 'white', textAlign: 'center', marginBottom: '2rem'}}>
-                  🎵 Custom Piano Sheet Player
-                </h1>
+          const loadToEditor = (name) => {
+            setCustomSheet(savedSheets[name]);
+            setSelectedSong('');
+          };
 
-                <div style={{display: 'grid', gridTemplateColumns: window.innerWidth >= 768 ? '1fr 1fr' : '1fr', gap: '1rem', marginBottom: '1rem'}}>
-                  {/* Saved Sheets */}
-                  <div style={{background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', borderRadius: '1rem', padding: '1rem'}}>
-                    <h2 style={{color: 'white', fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem'}}>My Saved Sheets</h2>
-                    
-                    {Object.keys(savedSheets).length === 0 ? (
-                      <div style={{color: 'rgba(255,255,255,0.7)', textAlign: 'center', padding: '2rem', fontSize: '0.875rem'}}>
-                        No saved sheets yet!
-                      </div>
-                    ) : (
-                      <div style={{maxHeight: '12rem', overflowY: 'auto', marginBottom: '1rem'}}>
-                        {Object.keys(savedSheets).map(name => (
-                          <div key={name} style={{display: 'flex', gap: '0.5rem', marginBottom: '0.5rem', background: 'rgba(255,255,255,0.1)', padding: '0.5rem', borderRadius: '0.5rem'}}>
-                            <button
-                              onClick={() => setSelectedSong(name)}
-                              style={{flex: 1, textAlign: 'left', padding: '0.5rem', borderRadius: '0.25rem', background: selectedSong === name ? '#a855f7' : 'rgba(255,255,255,0.1)', color: 'white', border: 'none', cursor: 'pointer'}}
-                            >
-                              {name}
-                            </button>
-                            <button
-                              onClick={() => {setCustomSheet(savedSheets[name]); setSelectedSong('');}}
-                              style={{padding: '0.5rem 1rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer'}}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => deleteSheet(name)}
-                              style={{padding: '0.5rem', background: '#ef4444', color: 'white', border: 'none', borderRadius: '0.25rem', cursor: 'pointer'}}
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    
-                    <div style={{display: 'flex', gap: '0.5rem'}}>
-                      <button
-                        onClick={handlePlay}
-                        disabled={isPlaying}
-                        style={{flex: 1, padding: '0.5rem 1rem', background: isPlaying ? '#6b7280' : '#10b981', color: 'white', border: 'none', borderRadius: '0.5rem', fontWeight: '600', cursor: isPlaying ? 'not-allowed' : 'pointer'}}
-                      >
-                        ▶️ Play
-                      </button>
-                      <button
-                        onClick={stopPlayback}
-                        disabled={!isPlaying}
-                        style={{padding: '0.5rem 1rem', background: !isPlaying ? '#6b7280' : '#ef4444', color: 'white', border: 'none', borderRadius: '0.5rem', fontWeight: '600', cursor: !isPlaying ? 'not-allowed' : 'pointer'}}
-                      >
-                        ⏸️ Stop
-                      </button>
-                    </div>
-                  </div>
+          const getKeyboardKey = (note) => {
+            for (let key in keyboardMap) {
+              if (keyboardMap[key] === note) {
+                return key.toUpperCase();
+              }
+            }
+            return '';
+          };
 
-                  {/* Custom Sheet */}
-                  <div style={{background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', borderRadius: '1rem', padding: '1rem'}}>
-                    <h2 style={{color: 'white', fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem'}}>Create Custom Sheet</h2>
-                    <textarea
-                      value={customSheet}
-                      onChange={(e) => {setCustomSheet(e.target.value); setSelectedSong('');}}
-                      placeholder="C4-500 E4-500 G4-500 C5-1000"
-                      style={{width: '100%', padding: '0.5rem', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.2)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', marginBottom: '0.5rem', height: '8rem', fontFamily: 'monospace', fontSize: '0.875rem'}}
-                      disabled={isPlaying}
-                    />
-                    
-                    <div style={{display: 'flex', gap: '0.5rem'}}>
-                      <input
-                        type="text"
-                        value={newSheetName}
-                        onChange={(e) => setNewSheetName(e.target.value)}
-                        placeholder="Sheet name..."
-                        style={{flex: 1, padding: '0.5rem', borderRadius: '0.5rem', background: 'rgba(255,255,255,0.2)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', fontSize: '0.875rem'}}
-                      />
-                      <button
-                        onClick={saveSheet}
-                        disabled={!newSheetName || !customSheet}
-                        style={{padding: '0.5rem 1rem', background: (!newSheetName || !customSheet) ? '#6b7280' : '#3b82f6', color: 'white', border: 'none', borderRadius: '0.5rem', fontWeight: '600', cursor: (!newSheetName || !customSheet) ? 'not-allowed' : 'pointer'}}
-                      >
-                        💾 Save
-                      </button>
-                    </div>
-                  </div>
-                </div>
+          const isMobile = window.innerWidth < 768;
 
-                {/* Piano */}
-                <div style={{background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', borderRadius: '1rem', padding: '1.5rem', overflowX: 'auto'}}>
-                  <div style={{position: 'relative', display: 'inline-flex', minWidth: '100%', justifyContent: 'center'}}>
-                    {displayKeys.map((key, i) => 
-                      key.white ? (
-                        <button
-                          key={key.note}
-                          onClick={() => handleKeyPress(key)}
-                          style={{
-                            position: 'relative',
-                            width: window.innerWidth < 768 ? '3rem' : '4rem',
-                            height: window.innerWidth < 768 ? '10rem' : '16rem',
-                            border: '2px solid #1f2937',
-                            borderRadius: '0 0 0.5rem 0.5rem',
-                            background: activeKey === key.note ? 'linear-gradient(to bottom, #fde047, #facc15)' : 'linear-gradient(to bottom, white, #e5e7eb)',
-                            transform: activeKey === key.note ? 'scale(0.95)' : 'scale(1)',
-                            transition: 'all 0.1s',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <span style={{position: 'absolute', bottom: '1rem', left: 0, right: 0, textAlign: 'center', color: '#374151', fontWeight: '600', fontSize: '0.75rem'}}>
-                            {key.note}
-                          </span>
-                        </button>
-                      ) : (
-                        <button
-                          key={key.note}
-                          onClick={() => handleKeyPress(key)}
-                          style={{
-                            position: 'absolute',
-                            width: window.innerWidth < 768 ? '2rem' : '2.75rem',
-                            height: window.innerWidth < 768 ? '6rem' : '10rem',
-                            borderRadius: '0 0 0.5rem 0.5rem',
-                            background: activeKey === key.note ? 'linear-gradient(to bottom, #a855f7, #7c3aed)' : 'linear-gradient(to bottom, #1f2937, black)',
-                            left: `${(Math.floor(i * 0.7) + 0.65) * (window.innerWidth < 768 ? 48 : 64)}px`,
-                            zIndex: 10,
-                            transform: activeKey === key.note ? 'scale(0.95)' : 'scale(1)',
-                            transition: 'all 0.1s',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <span style={{position: 'absolute', bottom: '0.5rem', left: 0, right: 0, textAlign: 'center', color: 'white', fontSize: '0.625rem'}}>
-                            {key.note}
-                          </span>
-                        </button>
+          return React.createElement('div', { 
+            className: 'stars-bg min-h-screen p-2 sm:p-4'
+          },
+            React.createElement('div', { className: 'max-w-7xl mx-auto relative z-10' },
+              React.createElement('h1', { 
+                className: 'text-2xl sm:text-3xl md:text-5xl font-bold text-white text-center mb-3 sm:mb-4 md:mb-8 drop-shadow-lg' 
+              }, '🎹 Piano Sheet Player'),
+
+              React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-4 mb-3 sm:mb-4' },
+                React.createElement('div', { className: 'bg-white/20 backdrop-blur-lg rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-xl' },
+                  React.createElement('h2', { className: 'text-white text-base sm:text-lg font-semibold mb-2 sm:mb-3' }, '📚 My Saved Sheets'),
+                  
+                  Object.keys(savedSheets).length === 0 ? 
+                    React.createElement('div', { className: 'text-white/70 text-center py-6 sm:py-8 text-xs sm:text-sm' }, 'No saved sheets yet!') :
+                    React.createElement('div', { className: 'max-h-32 sm:max-h-48 overflow-y-auto mb-3 sm:mb-4 space-y-1 sm:space-y-2' },
+                      Object.keys(savedSheets).map(name =>
+                        React.createElement('div', { key: name, className: 'flex gap-1 sm:gap-2 bg-white/10 p-1.5 sm:p-2 rounded' },
+                          React.createElement('button', {
+                            onClick: () => setSelectedSong(name),
+                            className: 'flex-1 text-left px-2 sm:px-3 py-1.5 sm:py-2 rounded text-xs sm:text-sm ' + (selectedSong === name ? 'bg-blue-600 text-white' : 'bg-white/10 text-white hover:bg-white/20')
+                          }, name),
+                          React.createElement('button', {
+                            onClick: () => loadToEditor(name),
+                            className: 'px-2 sm:px-3 py-1.5 sm:py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-xs sm:text-sm'
+                          }, 'Edit'),
+                          React.createElement('button', {
+                            onClick: () => deleteSheet(name),
+                            className: 'p-1.5 sm:p-2 bg-red-500 hover:bg-red-600 text-white rounded text-sm'
+                          }, '🗑️')
+                        )
                       )
-                    )}
-                  </div>
-                </div>
+                    ),
+                  
+                  React.createElement('div', { className: 'flex gap-2' },
+                    React.createElement('button', {
+                      onClick: handlePlay,
+                      disabled: isPlaying,
+                      className: 'flex-1 px-3 sm:px-4 py-2 sm:py-2.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-semibold text-sm sm:text-base shadow-lg'
+                    }, '▶️ Play'),
+                    React.createElement('button', {
+                      onClick: stopPlayback,
+                      disabled: !isPlaying,
+                      className: 'px-3 sm:px-4 py-2 sm:py-2.5 bg-red-500 hover:bg-red-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-semibold text-sm sm:text-base shadow-lg'
+                    }, '⏸️ Stop')
+                  )
+                ),
 
-                {/* Help */}
-                <div style={{marginTop: '1rem', background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', borderRadius: '1rem', padding: '1rem', color: 'white', fontSize: '0.875rem'}}>
-                  <h3 style={{fontWeight: '600', marginBottom: '0.5rem'}}>📝 How to Use:</h3>
-                  <p style={{marginBottom: '0.5rem'}}>• Format: <code style={{background: 'rgba(0,0,0,0.3)', padding: '0.25rem 0.5rem', borderRadius: '0.25rem'}}>NOTE-DURATION</code></p>
-                  <p style={{marginBottom: '0.5rem'}}>• Example: <code style={{background: 'rgba(0,0,0,0.3)', padding: '0.25rem 0.5rem', borderRadius: '0.25rem'}}>C4-500 E4-500 G4-500</code></p>
-                  <div style={{marginTop: '1rem', padding: '0.75rem', background: 'rgba(34,197,94,0.2)', borderRadius: '0.5rem', border: '1px solid rgba(34,197,94,0.3)'}}>
-                    <p style={{fontWeight: '600', marginBottom: '0.25rem'}}>🎵 Try this - "Twinkle Twinkle":</p>
-                    <code style={{fontSize: '0.75rem', display: 'block', background: 'rgba(0,0,0,0.3)', padding: '0.5rem', borderRadius: '0.25rem'}}>
-                      C4-500 C4-500 G4-500 G4-500 A4-500 A4-500 G4-1000 F4-500 F4-500 E4-500 E4-500 D4-500 D4-500 C4-1000
-                    </code>
-                  </div>
-                </div>
-              </div>
-            </div>
+                React.createElement('div', { className: 'bg-white/20 backdrop-blur-lg rounded-lg sm:rounded-xl p-3 sm:p-4 shadow-xl' },
+                  React.createElement('h2', { className: 'text-white text-base sm:text-lg font-semibold mb-2 sm:mb-3' }, '✏️ Create Custom Sheet'),
+                  React.createElement('textarea', {
+                    value: customSheet,
+                    onChange: (e) => { setCustomSheet(e.target.value); setSelectedSong(''); },
+                    placeholder: 'C4-500 E4-500 G4-500 C5-1000',
+                    className: 'w-full px-2 sm:px-3 py-2 rounded-lg bg-white/30 text-white placeholder-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400 mb-2 h-24 sm:h-32 resize-none font-mono text-xs sm:text-sm shadow-inner',
+                    disabled: isPlaying
+                  }),
+                  
+                  React.createElement('div', { className: 'flex gap-2' },
+                    React.createElement('input', {
+                      type: 'text',
+                      value: newSheetName,
+                      onChange: (e) => setNewSheetName(e.target.value),
+                      placeholder: 'Sheet name...',
+                      className: 'flex-1 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-white/30 text-white placeholder-white/60 border border-white/40 focus:outline-none focus:ring-2 focus:ring-blue-400 text-xs sm:text-sm shadow-inner'
+                    }),
+                    React.createElement('button', {
+                      onClick: saveSheet,
+                      disabled: !newSheetName || !customSheet,
+                      className: 'px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-semibold text-xs sm:text-sm shadow-lg'
+                    }, '💾 Save')
+                  )
+                )
+              ),
+
+              React.createElement('div', { className: 'bg-white/20 backdrop-blur-lg rounded-lg sm:rounded-xl p-2 sm:p-3 md:p-6 overflow-x-auto shadow-xl mb-3 sm:mb-4' },
+                React.createElement('div', { className: 'relative inline-flex min-w-full justify-center' },
+                  displayKeys.map((key, i) => {
+                    const kbKey = getKeyboardKey(key.note);
+                    return key.white ?
+                      React.createElement('button', {
+                        key: key.note,
+                        onClick: () => handleKeyPress(key),
+                        className: 'relative border-2 border-gray-800 rounded-b-lg transition-all shadow-lg ' + (activeKey === key.note ? 'bg-gradient-to-b from-yellow-300 to-yellow-500 scale-95' : 'bg-gradient-to-b from-white to-gray-200 hover:from-gray-100 hover:to-gray-300'),
+                        style: { width: isMobile ? '2.5rem' : '4rem', height: isMobile ? '8rem' : '16rem' }
+                      },
+                        React.createElement('div', { className: 'absolute left-0 right-0 text-center' , style: { bottom: isMobile ? '0.5rem' : '1rem' }},
+                          React.createElement('div', { className: 'text-gray-700 font-bold text-xs sm:text-sm' }, key.note),
+                          kbKey && React.createElement('div', { className: 'text-gray-500 text-xs mt-0.5' }, kbKey)
+                        )
+                      ) :
+                      React.createElement('button', {
+                        key: key.note,
+                        onClick: () => handleKeyPress(key),
+                        className: 'absolute rounded-b-lg z-10 transition-all shadow-xl ' + (activeKey === key.note ? 'bg-gradient-to-b from-purple-500 to-purple-700 scale-95' : 'bg-gradient-to-b from-gray-900 to-black hover:from-gray-800 hover:to-gray-900'),
+                        style: { 
+                          width: isMobile ? '1.75rem' : '2.75rem', 
+                          height: isMobile ? '5rem' : '10rem',
+                          left: (Math.floor(i * 0.7) + 0.65) * (isMobile ? 40 : 64) + 'px'
+                        }
+                      },
+                        React.createElement('div', { className: 'absolute left-0 right-0 text-center', style: { bottom: isMobile ? '0.25rem' : '0.5rem' }},
+                          React.createElement('div', { className: 'text-white text-xs' }, key.note),
+                          kbKey && React.createElement('div', { className: 'text-white/70 text-xs mt-0.5' }, kbKey)
+                        )
+                      )
+                  })
+                )
+              ),
+
+              React.createElement('div', { className: 'bg-white/20 backdrop-blur-lg rounded-lg sm:rounded-xl p-3 sm:p-4 text-white text-xs sm:text-sm shadow-xl' },
+                React.createElement('h3', { className: 'font-semibold mb-2 text-sm sm:text-base' }, '📝 How to Use:'),
+                React.createElement('p', { className: 'mb-1 sm:mb-2' }, '• Format: NOTE-DURATION (e.g., C4-500 E4-500)'),
+                React.createElement('p', { className: 'mb-1 sm:mb-2' }, '• Use keyboard keys to play (A-L on PC)'),
+                React.createElement('p', { className: 'mb-2 sm:mb-3' }, '• Duration in milliseconds (500 = 0.5 sec)'),
+                React.createElement('div', { className: 'mt-2 sm:mt-3 p-2 sm:p-3 bg-green-500/30 rounded-lg border border-green-400/50' },
+                  React.createElement('p', { className: 'font-semibold mb-1' }, '🎵 Try "Twinkle Twinkle":'),
+                  React.createElement('code', { className: 'text-xs block bg-black/30 p-2 rounded overflow-x-auto' }, 
+                    'C4-500 C4-500 G4-500 G4-500 A4-500 A4-500 G4-1000 F4-500 F4-500 E4-500 E4-500 D4-500 D4-500 C4-1000'
+                  )
+                )
+              )
+            )
           );
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<Piano />);
+        root.render(React.createElement(Piano));
     </script>
 </body>
 </html>
