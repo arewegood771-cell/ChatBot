@@ -237,30 +237,75 @@
             if (activeOscillatorsRef.current[key.note]) return;
             
             const ctx = audioContextRef.current;
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
+            
+            // Main oscillator - piano fundamental
+            const osc1 = ctx.createOscillator();
+            const gain1 = ctx.createGain();
+            
+            // Harmonic oscillators for richer piano sound
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            
+            const osc3 = ctx.createOscillator();
+            const gain3 = ctx.createGain();
+            
+            // Filter for natural tone shaping
             const filter = ctx.createBiquadFilter();
+            
+            // Master gain
+            const masterGain = ctx.createGain();
+            
+            // Compressor for smooth dynamics
             const compressor = ctx.createDynamicsCompressor();
 
-            osc.connect(filter);
-            filter.connect(gain);
-            gain.connect(compressor);
+            // Setup oscillators with harmonics
+            osc1.frequency.value = key.freq;
+            osc1.type = 'sine';
+            
+            osc2.frequency.value = key.freq * 2; // First harmonic
+            osc2.type = 'sine';
+            
+            osc3.frequency.value = key.freq * 3; // Second harmonic
+            osc3.type = 'sine';
+
+            // Connect oscillators to their gains
+            osc1.connect(gain1);
+            osc2.connect(gain2);
+            osc3.connect(gain3);
+            
+            // Mix harmonics
+            gain1.connect(filter);
+            gain2.connect(filter);
+            gain3.connect(filter);
+            
+            filter.connect(masterGain);
+            masterGain.connect(compressor);
             compressor.connect(ctx.destination);
 
-            osc.frequency.value = key.freq;
-            osc.type = 'sine';
-            
+            // Filter settings for piano-like tone
             filter.type = 'lowpass';
-            filter.frequency.value = key.freq * 3;
+            filter.frequency.value = key.freq * 4;
             filter.Q.value = 1;
 
-            gain.gain.setValueAtTime(0, ctx.currentTime);
-            gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.01);
-            gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.1);
+            // Volume levels for harmonics
+            gain1.gain.value = 0.6; // Main tone
+            gain2.gain.value = 0.2; // First harmonic (quieter)
+            gain3.gain.value = 0.1; // Second harmonic (even quieter)
 
-            osc.start(ctx.currentTime);
+            // Piano envelope: fast attack, sustain, slow release
+            const now = ctx.currentTime;
+            masterGain.gain.setValueAtTime(0, now);
+            masterGain.gain.linearRampToValueAtTime(0.7, now + 0.005); // Fast attack
+            masterGain.gain.exponentialRampToValueAtTime(0.5, now + 0.1); // Sustain level
 
-            activeOscillatorsRef.current[key.note] = { osc, gain };
+            osc1.start(now);
+            osc2.start(now);
+            osc3.start(now);
+
+            activeOscillatorsRef.current[key.note] = { 
+              oscillators: [osc1, osc2, osc3], 
+              gain: masterGain 
+            };
             
             setActiveKeys(prev => {
               const newActive = new Set(prev);
@@ -270,21 +315,25 @@
           };
 
           const stopNote = (key) => {
-            const oscillator = activeOscillatorsRef.current[key.note];
-            if (!oscillator) return;
+            const data = activeOscillatorsRef.current[key.note];
+            if (!data) return;
 
             const ctx = audioContextRef.current;
-            const { osc, gain } = oscillator;
+            const { oscillators, gain } = data;
 
-            gain.gain.cancelScheduledValues(ctx.currentTime);
-            gain.gain.setValueAtTime(gain.gain.value, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+            // Piano release envelope
+            const now = ctx.currentTime;
+            gain.gain.cancelScheduledValues(now);
+            gain.gain.setValueAtTime(gain.gain.value, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5); // Slow piano release
 
-            osc.stop(ctx.currentTime + 0.3);
+            oscillators.forEach(osc => {
+              osc.stop(now + 0.5);
+            });
             
             setTimeout(() => {
               delete activeOscillatorsRef.current[key.note];
-            }, 350);
+            }, 550);
 
             setActiveKeys(prev => {
               const newActive = new Set(prev);
@@ -296,27 +345,64 @@
           const playNoteOnce = (frequency, duration) => {
             duration = duration || 300;
             const ctx = audioContextRef.current;
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
+            
+            // Main oscillator
+            const osc1 = ctx.createOscillator();
+            const gain1 = ctx.createGain();
+            
+            // Harmonics
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            
+            const osc3 = ctx.createOscillator();
+            const gain3 = ctx.createGain();
+            
             const filter = ctx.createBiquadFilter();
+            const masterGain = ctx.createGain();
 
-            osc.connect(filter);
-            filter.connect(gain);
-            gain.connect(ctx.destination);
+            osc1.frequency.value = frequency;
+            osc1.type = 'sine';
+            
+            osc2.frequency.value = frequency * 2;
+            osc2.type = 'sine';
+            
+            osc3.frequency.value = frequency * 3;
+            osc3.type = 'sine';
 
-            osc.frequency.value = frequency;
-            osc.type = 'sine';
+            osc1.connect(gain1);
+            osc2.connect(gain2);
+            osc3.connect(gain3);
+            
+            gain1.connect(filter);
+            gain2.connect(filter);
+            gain3.connect(filter);
+            
+            filter.connect(masterGain);
+            masterGain.connect(ctx.destination);
+
             filter.type = 'lowpass';
-            filter.frequency.value = frequency * 3;
+            filter.frequency.value = frequency * 4;
+            filter.Q.value = 1;
 
+            gain1.gain.value = 0.6;
+            gain2.gain.value = 0.2;
+            gain3.gain.value = 0.1;
+
+            const now = ctx.currentTime;
             const release = duration / 1000;
-            gain.gain.setValueAtTime(0, ctx.currentTime);
-            gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.01);
-            gain.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.1);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + release);
+            
+            masterGain.gain.setValueAtTime(0, now);
+            masterGain.gain.linearRampToValueAtTime(0.7, now + 0.005);
+            masterGain.gain.exponentialRampToValueAtTime(0.5, now + 0.1);
+            masterGain.gain.exponentialRampToValueAtTime(0.01, now + release);
 
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + release);
+            osc1.start(now);
+            osc2.start(now);
+            osc3.start(now);
+            
+            osc1.stop(now + release);
+            osc2.stop(now + release);
+            osc3.stop(now + release);
           };
 
           const parseSheet = (sheet) => {
@@ -487,7 +573,7 @@
                       onClick: handlePlay,
                       disabled: isPlaying,
                       className: 'flex-1 px-3 sm:px-4 py-2 sm:py-2.5 bg-green-500 hover:bg-green-600 disabled:bg-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-semibold text-sm sm:text-base shadow-lg transition-colors'
-                    }, isPlaying ? 'Playing... 🎵' : 'Play 😹'),
+                    }, isPlaying ? 'Playing...' : 'Play 😹'),
                     React.createElement('button', {
                       onClick: stopPlayback,
                       disabled: !isPlaying,
@@ -548,34 +634,7 @@
                       React.createElement('button', {
                         key: key.note,
                         onMouseDown: () => handleMouseDown(key),
-                        onMouseUp: () => handleMouseUp(key),
-                        onMouseLeave: () => handleMouseLeave(key),
-                        onTouchStart: (e) => { e.preventDefault(); handleMouseDown(key); },
-                        onTouchEnd: (e) => { e.preventDefault(); handleMouseUp(key); },
-                        className: 'absolute rounded-b-lg z-10 transition-all shadow-xl select-none ' + (isActive ? 'bg-gradient-to-b from-purple-500 to-purple-700 scale-95' : 'bg-gradient-to-b from-gray-900 to-black hover:from-gray-800 hover:to-gray-900'),
-                        style: { 
-                          width: isMobile ? '1.75rem' : '2.75rem', 
-                          height: isMobile ? '5rem' : '10rem',
-                          left: (Math.floor(i * 0.7) + 0.65) * (isMobile ? 40 : 64) + 'px'
-                        }
-                      },
-                        React.createElement('div', { className: 'absolute left-0 right-0 text-center', style: { bottom: isMobile ? '0.25rem' : '0.5rem' }},
-                          React.createElement('div', { className: 'text-white text-xs' }, key.note),
-                          kbKey && React.createElement('div', { className: 'text-white/70 text-xs mt-0.5' }, kbKey)
-                        )
-                      )
-                  })
-                )
-              ),
-
-              React.createElement('div', { className: 'bg-white/20 backdrop-blur-lg rounded-lg sm:rounded-xl p-3 sm:p-4 text-white text-xs sm:text-sm shadow-xl' },
-                React.createElement('h3', { className: 'font-semibold mb-2 text-sm sm:text-base' }, 'Cara Pakai 😹'),
-                React.createElement('p', { className: 'mb-1 sm:mb-2' }, '• Format: Note-Durasi gitu sih 😹 (contoh: C4-500 E4-500)'),
-                React.createElement('p', { className: 'mb-1 sm:mb-2' }, '• Pake keyboard buat main - teken beberapa key sekaligus bisa! 💔'),
-                React.createElement('p', { className: 'mb-1 sm:mb-2' }, '• Keyboard layout: Z-M (octave 3), Q-U (octave 4), I-] (octave 5) 🥀'),
-                React.createElement('p', { className: 'mb-2 sm:mb-3' }, '• Durasi pake milidetik ya 🥀 (500 = setengah detik)'),
-                React.createElement('p', { className: 'mb-2 sm:mb-3' }, '• Bisa langsung paste Virtual Piano format terus auto convert 💔'),
-                React.createElement('div', { className: 'mt-2 sm:mt-3 p-2 sm:p-3 bg-green-500/30 rounded-lg border border-green-400/50' },
+                  React.createElement('div', { className: 'mt-2 sm:mt-3 p-2 sm:p-3 bg-green-500/30 rounded-lg border border-green-400/50' },
                   React.createElement('p', { className: 'font-semibold mb-1' }, 'Cobain deh ini 😹:'),
                   React.createElement('code', { className: 'text-xs block bg-black/30 p-2 rounded overflow-x-auto' }, 
                     'G4-400 A4-400 C5-400 A4-400 E5-600 D5-400 C5-600 A4-400 G4-400 A4-400 C5-600 D5-600 C5-600 A4-800'
@@ -590,4 +649,5 @@
         root.render(React.createElement(Piano));
     </script>
 </body>
+</html>
 </html>
